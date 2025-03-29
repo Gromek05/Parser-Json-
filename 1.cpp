@@ -26,96 +26,110 @@
 
 using namespace std;
 
-#define ILLEGAL "ILLEGAL"
-// #define EOF     "EOF" 
-#define COMMA  ","
-#define COLON  ":"
-#define LBRACE  "{"
-#define RBRACE  "}"
-#define LBRACK  "["
-#define RBRACK  "]"
-#define INT     "INT"
-#define BOOL    "BOOL"
-#define STRING  "STRING"
+// #define ILLEGAL "ILLEGAL"
+// // #define EOF     "EOF" 
+// #define COMMA  ","
+// #define COLON  ":"
+// #define LBRACE  "{"
+// #define RBRACE  "}"
+// #define LBRACK  "["
+// #define RBRACK  "]"
+// #define INT     "INT"
+// #define BOOL    "BOOL"
+// #define STRING  "STRING"
 
 
-// class Lexer {
-//     string input;
-//     int position;
-//     int readPosition;
-//     char ch; // byte ch
-// };
+enum class Token_type{
+    ILLEGAL,
+    EOF_TOKEN,    
+    COMMA,  
+    COLON,  
+    LBRACE,
+    RBRACE,
+    LBRACK,
+    RBRACK,
+    INT,
+    BOOL,
+    STRING
+};
+
+struct Token {
+    Token_type type;
+    string literal;
+};
 
 
+class Lexer {
+    private:
+    string input;
+    int position = 0;
+    int readPosition = 0;
+    char ch; // byte ch (tablica ASCI )
 
-// Lexer createLexer(string input) {
-//     l = &Lexer{input: input};
-//     l.readChar();
-//     return l;
-// }
-
-
-string token(char a){
-    string output = "";
-    switch (a) {  //sprawdzamy znak
-
-        case '{':
-            output += "{    ";
-            output += a;
-            output += "\n";
-            // tok = token.Token{Type: token.LBRACE, Literal: string(l.ch)};
-            break;
-        case '}':
-            output += "}    ";
-            output += a;
-            output += "\n";
-            // tok = token.Token{Type: token.RBRACE, Literal: string(l.ch)};
-            break;
-        case ':':
-            output += ":    ";
-            output += a;
-            output += "\n";
-            // tok = token.Token{Type: token.COLON, Literal: string(l.ch)};
-            break;
-        case '"': 
-            output += "STRING    ";   // jesli cudzyslów to dajemy STRING (trzeba tez dodac INT i BOOL)
-            // tok.Literal = l.readString() // This reads characters until " is encountered
-            // tok.Type = token.STRING;
-            break;
-        case ',':
-            output += ",    ";
-            output += a;
-            output += "\n";
-            // tok = token.Token{Type: token.COMMA, Literal: string(l.ch)};
-            break;
-        case 0:
-            // tok.Literal = "";
-            // tok.Type = token.EOF;
-            break;
-        default:
-            output += a;
+    void read_char(){
+        if (readPosition >= input.length()){ // koniec napisu
+            ch = 0; // ustawiamy ch
         }
-        return output;
-}
 
-string reader_string(string input) {  // w petli przechodzimy przez string wejsciowy
-    string output = "";  // string wyjsciowy
-    int firstMarks = 0; // zmienna sprawdzajaca czy to pierwszy cudzysłow czy drugi
-    for (int i = 0; i < input.length(); i++) {
-        char a = input[i]; // bierzemy jeden znak z input
-        if (a == '\"' && firstMarks == 0) { // sprawdzam czy znak jest cudzysłow
-            firstMarks = 1;
-        } else if (a == '\"' && firstMarks == 1) {  // jesli drugi cudzyslow
-            firstMarks = 0;
-            output += "\n"; // nowa linia w output
-            continue; // nie wywyolujemy metody token ponizej
+        else {
+            ch = input[readPosition]; // wczytujemy znak
         }
-        output += token(a);   // sprawdzamy znak, wywolujac metode token
-        
+
+        position = readPosition;
+        readPosition++;
     }
-    return output;
 
-}
+    string read_string(){
+        string result;
+        read_char();
+        while (ch!='"' && ch != 0){ // przechodzimy przez wyraz az dojde do " lub do konca wyrazu
+            result += ch;
+            read_char();
+        }
+        return result;
+    }
+
+    public:
+
+    Lexer(const string &input):input(input){ // konstruktor
+        // this->input = input;
+        read_char();
+    }
+
+    Token next_token(){
+        Token token;
+
+        // pominiecie bialych znakow
+        while (isspace(ch)) read_char();
+
+
+        switch (ch){
+            case '{':
+                token = {Token_type::LBRACE, "{"};
+                break;
+            case '}':
+                token = {Token_type::RBRACE, "}"};
+                break;
+            case ':':
+                token = {Token_type::COLON, ":"};
+                break;
+            case ',':
+                token = {Token_type::COMMA, ","};
+                break;
+            case '"':
+                token = {Token_type::STRING, read_string()}; // metoda read_string zwroci napis po znaku "
+                break;
+            case 0: // sprawdza czy koniec wyrazu
+                token = {Token_type::EOF_TOKEN, ""};
+                break;
+        }
+
+        read_char();
+        return token;
+    }
+
+};
+
 
 int main(){
     string data = 
@@ -123,8 +137,13 @@ int main(){
     "    \"Name\": \"cats are cute\"\n"
     // "    \"Age\": 123423\n"
     "}";
-    data = reader_string(data);
-    cout << data;
+    
+   Token token;
+   Lexer lexer(data);
+   do {
+    token = lexer.next_token();
+    cout << "Token Type: " << static_cast<int>(token.type) << " " << token.literal << endl; // problem z wyswietleniem token.type jako string
+   } while(token.type != Token_type::EOF_TOKEN);
 
 }
 
