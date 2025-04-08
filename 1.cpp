@@ -26,20 +26,10 @@
 
 using namespace std;
 
-// #define ILLEGAL "ILLEGAL"
-// // #define EOF     "EOF" 
-// #define COMMA  ","
-// #define COLON  ":"
-// #define LBRACE  "{"
-// #define RBRACE  "}"
-// #define LBRACK  "["
-// #define RBRACK  "]"
-// #define INT     "INT"
-// #define BOOL    "BOOL"
-// #define STRING  "STRING"
 
 
-enum class Token_type{
+
+enum class TokenType{
     ILLEGAL,
     EOF_TOKEN,    
     COMMA,  
@@ -53,8 +43,68 @@ enum class Token_type{
     STRING
 };
 
+
+string token_type_to_string(TokenType type){ // dla tokentype zwrocenie odpowiedniego napisu
+    switch(type)
+    {
+        case TokenType::ILLEGAL:
+        return "ILLEGAL";
+        break;
+
+        case TokenType::EOF_TOKEN:
+        return "";
+        break;
+
+        case TokenType::COMMA:
+        return ",";
+        break;
+
+        case TokenType::COLON:
+        return ":";
+        break;
+
+
+        case TokenType::LBRACE:
+        return "{";
+        break;
+
+
+        case TokenType::RBRACE:
+        return "}";
+        break;
+
+        case TokenType::LBRACK:
+        return "[";
+        break;
+
+
+        case TokenType::RBRACK:
+        return "]";
+        break;
+
+
+        case TokenType::INT:
+        return "INT";
+        break;
+
+
+        case TokenType::BOOL:
+        return "BOOL";
+        break;
+
+
+        case TokenType::STRING:
+        return "STRING";
+        break;
+        
+        default: 
+        return "";
+        break;
+    }
+} 
+
 struct Token {
-    Token_type type;
+    TokenType type;
     string literal;
 };
 
@@ -89,10 +139,29 @@ class Lexer {
         return result;
     }
 
+    string read_number(){
+        string result;
+        while(isdigit(ch)){ // sprawdza czy jest liczba
+            result += ch;
+            read_char();
+        }
+        return result;
+        
+    }
+
+
+    string read_bool(){
+        string result;
+        while(isalpha(ch)){ // sprawdza czy jest literą alfabetu / nie ma cudzysłowia True/False
+            result += ch;
+            read_char();
+        }
+        return result;
+    }
+
     public:
 
     Lexer(const string &input):input(input){ // konstruktor
-        // this->input = input;
         read_char();
     }
 
@@ -102,26 +171,44 @@ class Lexer {
         // pominiecie bialych znakow
         while (isspace(ch)) read_char();
 
-
         switch (ch){
             case '{':
-                token = {Token_type::LBRACE, "{"};
+                token = {TokenType::LBRACE, "{"};
                 break;
             case '}':
-                token = {Token_type::RBRACE, "}"};
+                token = {TokenType::RBRACE, "}"};
                 break;
             case ':':
-                token = {Token_type::COLON, ":"};
+                token = {TokenType::COLON, ":"};
                 break;
             case ',':
-                token = {Token_type::COMMA, ","};
+                token = {TokenType::COMMA, ","};
                 break;
             case '"':
-                token = {Token_type::STRING, read_string()}; // metoda read_string zwroci napis po znaku "
+                token = {TokenType::STRING, read_string()}; // metoda read_string zwroci napis po znaku "
                 break;
             case 0: // sprawdza czy koniec wyrazu
-                token = {Token_type::EOF_TOKEN, ""};
+                token = {TokenType::EOF_TOKEN, ""};
                 break;
+            default:
+                if (isdigit(ch)){ // jesli jest cyfra
+                    token = {TokenType::INT, read_number()};
+                    if (ch == ',') {
+                        readPosition--;  // cofamy się żeby jeszcze raz odczytac przecinek
+                    }
+                }
+                else if (isalpha(ch)){ // jesli znak jest z alfabetu
+                    token = {TokenType::BOOL, read_bool()};
+                    if (ch == ',') {
+                        readPosition--;  // cofamy się żeby jeszcze raz odczytac przecinek
+                    }
+                }
+                else { // jesli inny znak
+                    token = {TokenType::ILLEGAL, "ILLEGAL"};
+                    read_char();
+                }
+                break;
+                
         }
 
         read_char();
@@ -134,22 +221,16 @@ class Lexer {
 int main(){
     string data = 
     "{\n"
-    "    \"Name\": \"cats are cute\"\n"
-    // "    \"Age\": 123423\n"
+    "    \"Name\": \"cats are cute\",\n"
+    "    \"Age\": 123423,\n"
+    "    \"Isallive\": true\n"
     "}";
     
    Token token;
    Lexer lexer(data);
    do {
     token = lexer.next_token();
-    cout << "Token Type: " << static_cast<int>(token.type) << " " << token.literal << endl; // problem z wyswietleniem token.type jako string
-   } while(token.type != Token_type::EOF_TOKEN);
+    cout << token_type_to_string(token.type) << "   " << token.literal << endl;
+   } while(token.type != TokenType::EOF_TOKEN);
 
 }
-
-//chcemy miec taki wynik:
-// {    {
-//     STRING    Name
-//     :    :
-//     STRING    cats are cute
-//     }    }
