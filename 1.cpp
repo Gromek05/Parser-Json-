@@ -1,27 +1,25 @@
-// data := `{
-//     "Name":"cats are cute",
-//     "Age": 123423,
-//     "IsAlive": true,
-//     "ScoreInt" : [1,2,3],
-//     "ScoreBool" : [false, false, true],
-//     "Scorelist" : [[1,2,3], [23,3]],
-//     "Scorestr" : ["ma", "sco", "sec"],
-//     "address" : {
-//             "city" : "Mumbai",
-//             "state" : "Maharashtra"
-//         }
-//     }
+// // data := `{
+// //     "Name":"cats are cute",
+// //     "Age": 123423,
+// //     "IsAlive": true,
+// //     "ScoreInt" : [1,2,3],
+// //     "ScoreBool" : [false, false, true],
+// //     "Scorelist" : [[1,2,3], [23,3]],
+// //     "Scorestr" : ["ma", "sco", "sec"],
+// //     "address" : {
+// //             "city" : "Mumbai",
+// //             "state" : "Maharashtra"
+// //         }
+// //     }
 
-// Name : cats are cute
-// Age : 123423
-// IsAlive : true
-// ScoreInt : [1 2 3]
-// ScoreBool : [false false true]
-// Scorelist : [[1 2 3] [23 3]]
-// Scorestr : [ma sco sec]
-// address : map[city:Mumbai state:Maharashtra]
-
-
+// // Name : cats are cute
+// // Age : 123423
+// // IsAlive : true
+// // ScoreInt : [1 2 3]
+// // ScoreBool : [false false true]
+// // Scorelist : [[1 2 3] [23 3]]
+// // Scorestr : [ma sco sec]
+// // address : map[city:Mumbai state:Maharashtra]
 
 #include <iostream>
 #include <map>
@@ -151,7 +149,7 @@ class Lexer {
 
     string read_bool(){
         string result;
-        while(isalpha(ch)){ // sprawdza czy jest litera alfabetu / nie ma cudzyslowia True/False
+        while(isalpha(ch)){ // sprawdza czy jest literą alfabetu / nie ma cudzysłowia True/False
             result += ch;
             read_char();
         }
@@ -186,6 +184,12 @@ class Lexer {
             case '"':
                 token = {TokenType::STRING, read_string()}; // metoda read_string zwroci napis po znaku "
                 break;
+            case '[':
+                token = {TokenType::LBRACK, "["};
+                break;
+            case ']':
+                token = {TokenType::RBRACK, "]"};
+                break;
             case 0: // sprawdza czy koniec wyrazu
                 token = {TokenType::EOF_TOKEN, ""};
                 break;
@@ -193,13 +197,13 @@ class Lexer {
                 if (isdigit(ch)){ // jesli jest cyfra
                     token = {TokenType::INT, read_number()};
                     if (ch == ',') {
-                        readPosition--;  // cofamy sie zeby jeszcze raz odczytac przecinek
+                        readPosition--;  // cofamy się żeby jeszcze raz odczytac przecinek
                     }
                 }
                 else if (isalpha(ch)){ // jesli znak jest z alfabetu
                     token = {TokenType::BOOL, read_bool()};
                     if (ch == ',') {
-                        readPosition--;  // cofamy sie zeby jeszcze raz odczytac przecinek
+                        readPosition--;  // cofamy się żeby jeszcze raz odczytac przecinek
                     }
                 }
                 else { // jesli inny znak
@@ -216,104 +220,135 @@ class Lexer {
 
 };
 
-class Parser {  // klasa Parser będzie analizować strukturę JSON
+class Parser {
 private:
-    Lexer lexer;         // Obiekt analizatora leksykalnego (dzieli tekst na tokeny)
-    Token curToken;      // Bieżący token (obecnie analizowany element JSON)
-    Token peekToken;     // Kolejny token (do podejrzenia, co będzie dalej)
+    Lexer lexer;
+    Token curToken;
+    Token peekToken;
 
-    // Przesuwa analizę o jeden token do przodu
     void nextToken() {
-        curToken = peekToken;             // Ustaw bieżący token na poprzedni peekToken
-        peekToken = lexer.next_token();   // Pobierz kolejny token z leksera
+        curToken = peekToken;
+        peekToken = lexer.next_token();
     }
 
-    // Rekurencyjna funkcja do parsowania jednej pary klucz-wartość
-    void parseKeyValue(map<string, string>& values) {
-        string key;  // Miejsce na zapisanie klucza
 
-        switch (curToken.type) {  // Sprawdź typ bieżącego tokena
-            case TokenType::STRING:  // Klucz musi być stringiem
-                key = curToken.literal;  // Zapisz klucz
 
-                nextToken();  // Przejdź do tokena z dwukropkiem `:`
 
-                if (curToken.type != TokenType::COLON) {  // Sprawdź, czy po kluczu jest ':'
-                    cout << "Expected COLON, got: " << (int)curToken.type << endl;
-                    return;  // kończymy
-                }
+string parseArray() {
+    string result = "[";               // Inicjalizujemy wynik jako otwierający nawias kwadratowy
+    bool first = true;                // czy jesteśmy przy pierwszym elemencie
 
-                nextToken();  // Przejdź do wartości przypisanej do klucza
+    nextToken(); // omijamy '['        // Przechodzimy do pierwszego tokena po '['
 
-                // Jeżeli wartość to boolean
-                if (curToken.type == TokenType::BOOL) {
-                    string boolStr;
-                    if (curToken.literal == "true") {
-                        boolStr = "true";  // Poprawna wartość logiczna
-                    } else if (curToken.literal == "false") {
-                        boolStr = "false";
-                    } else {
-                        cout << "Invalid bool value" << endl;  // Błąd: nieznana wartość boolowska
-                    }
-                    values[key] = boolStr;  // Zapisz do mapy jako string
-                }
+    while (curToken.type != TokenType::RBRACK && curToken.type != TokenType::EOF_TOKEN) {
+        // Pętla dopóki nie napotkamy końca tablicy ']' lub końca pliku
 
-                // Jeżeli wartość to liczba całkowita (INT)
-                else if (curToken.type == TokenType::INT) {
-                    try {
-                        int intVal = stoi(curToken.literal);       // Konwertuj string na int
-                        values[key] = to_string(intVal);           // Zapisz z powrotem jako string do mapy
-                    } catch (const invalid_argument&) {
-                        cout << "Invalid integer value" << endl;   // Błąd konwersji
-                    }
-                }
+        if (curToken.type == TokenType::COMMA) {
+            nextToken(); // omijamy przecinki między wartościami
+            continue;    // przechodzimy do kolejnego tokena
+        }
 
-                // Jeżeli wartość to string
-                else if (curToken.type == TokenType::STRING) {
-                    values[key] = curToken.literal;  // Po prostu zapisujemy stringa do mapy
-                }
+        if (!first) result += " ";     // Dodajemy spację przed kolejnym elementem jeśli to nie pierwszy
 
-                nextToken();  // Przejdź do następnego tokena po wartości (może to być przecinek lub })
+        if (curToken.type == TokenType::INT ||
+            curToken.type == TokenType::BOOL ||
+            curToken.type == TokenType::STRING) {
+            result += curToken.literal; // Dodajemy wartość (int, bool, string) do wyniku
+            nextToken();                // Przechodzimy do kolejnego tokena
+        } else if (curToken.type == TokenType::LBRACK) {
+            result += parseArray();     // Rekurencyjnie przetwarzamy zagnieżdżoną tablicę
+        } else {
+            break;                      // Nieznany token - przerywamy parsowanie tablicy
+        }
 
-                // Jeśli to nie koniec obiektu (czyli nie RBRACE – '}' ), to parsujemy kolejną parę
-                if (curToken.type != TokenType::RBRACE) {
-                    nextToken();  // Przejdź do kolejnego klucza
-                    parseKeyValue(values);  // Wywołaj rekurencyjnie analizę następnej pary
-                }
-                break;
+        first = false;                  // Po pierwszym elemencie ustawiamy flagę
+    }
+
+    if (curToken.type == TokenType::RBRACK) {
+        result += "]";       // Dodajemy zamykający nawias jeśli faktycznie znaleźliśmy ']'
+        nextToken();         // Przechodzimy do kolejnego tokena po ']'
+    } else {
+        result += "]";       // Jeśli nawiasu nie było, i tak kończymy wynik nawiasem
+    }
+
+    return result;           // Zwracamy zbudowaną reprezentację tablicy jako string
+}
+
+
+
+
+void parse(map<string, string>& values) {
+    while (curToken.type != TokenType::RBRACE && curToken.type != TokenType::EOF_TOKEN) {
+        // Pętla dopóki nie napotkamy końca obiektu '}' lub końca pliku
+
+        if (curToken.type != TokenType::STRING) {
+            nextToken();      // Jeśli nie znaleźliśmy klucza jako string, pomijamy token
+            continue;
+        }
+
+        string key = curToken.literal;  // Zapisujemy klucz (nazwa pola w obiekcie)
+        nextToken();  // Przechodzimy do ':' po kluczu
+
+        if (curToken.type != TokenType::COLON) {
+            return;           // Jeśli nie ma dwukropka po kluczu - błąd formatu
+        }
+
+        nextToken();  // Przechodzimy do wartości po dwukropku
+
+        if (curToken.type == TokenType::LBRACK) {
+            values[key] = parseArray(); // Jeśli wartość to tablica - wywołujemy `parseArray`
+        } else if (curToken.type == TokenType::INT ||
+                   curToken.type == TokenType::BOOL ||
+                   curToken.type == TokenType::STRING) {
+            values[key] = curToken.literal; // Wartość to zwykła wartość (int, bool, string)
+            nextToken();                    // Przechodzimy do kolejnego tokena
+        } else {
+            return;           // Błąd - nieznany typ wartości
+        }
+
+        if (curToken.type == TokenType::COMMA) {
+            nextToken();      // Jeśli jest przecinek, to przechodzimy do kolejnego pola
+        } else if (curToken.type != TokenType::RBRACE) {
+            return;           // Jeśli nie ma przecinka ani zamknięcia obiektu - błąd formatu
         }
     }
 
+    if (curToken.type == TokenType::RBRACE) {
+        nextToken();          // Jeśli znaleziono '}', przechodzimy dalej
+    }
+}
+
+
 public:
-    // Konstruktor – przyjmuje string JSON jako wejście
     Parser(const std::string& input) : lexer(input) {
-        nextToken();  // Pobierz pierwszy token (peekToken)
-        nextToken();  // Przesuń peekToken do przodu i ustaw pierwszy curToken
+        nextToken();
+        nextToken();
     }
 
-    // Funkcja zwraca sparsowaną mapę (klucz:wartość)
     map<string, string> parseJson() {
-        map<string, string> values;  // Tu zbieramy wynik
+        map<string, string> values;
 
-        if (curToken.type != TokenType::LBRACE)  // Sprawdź, czy JSON zaczyna się od '{'
-            return values;  // Jeśli nie, zwróć pustą mapę
+        if (curToken.type != TokenType::LBRACE) {
+            cout << "Brak znaku { na poczatku" << endl;
+            return values;
+        }
 
-        nextToken();        // Przejdź do pierwszego klucza
-        parseKeyValue(values);  // Rozpocznij analizę klucz–wartość
+        nextToken();  // ominiecie '{'
+        parse(values);
 
-        return values;  // Zwróć wynik
+        return values;
     }
 };
 
 int main(){
 
-    string data1 = "{\"Name\":\"cats are cute\", \"Age\": 11, \"isAlive\": true}";
-
+    string data1 = "{\"Name\":\"cats are cute\", \"Age\": 11, \"isAlive\": true, \"ScoreInt\": [ 1,2,3,[9,8,7]]}";
+    // string data1 = "{\"ScoreBool\": [false, false, true]}";
     Parser parser(data1);
-    map<string, string> values = parser.parseJson(); // Uruchamia analizę JSON-a.
+    map<string, string> values = parser.parseJson();
 
-    for (const auto& pair : values) { // Iteruje po wszystkich parach klucz:wartość w mapie
-        cout << pair.first << "  :  " << pair.second << std::endl; // wypisuje kazda parę
+    for (const auto& pair : values) {
+        cout << pair.first << "  :  " << pair.second << std::endl;
     }
 
 }
