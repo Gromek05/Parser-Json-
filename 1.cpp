@@ -1,27 +1,5 @@
-// // data := `{
-// //     "Name":"cats are cute",
-// //     "Age": 123423,
-// //     "IsAlive": true,
-// //     "ScoreInt" : [1,2,3],
-// //     "ScoreBool" : [false, false, true],
-// //     "Scorelist" : [[1,2,3], [23,3]],
-// //     "Scorestr" : ["ma", "sco", "sec"],
-// //     "address" : {
-// //             "city" : "Mumbai",
-// //             "state" : "Maharashtra"
-// //         }
-// //     }
-
-// // Name : cats are cute
-// // Age : 123423
-// // IsAlive : true
-// // ScoreInt : [1 2 3]
-// // ScoreBool : [false false true]
-// // Scorelist : [[1 2 3] [23 3]]
-// // Scorestr : [ma sco sec]
-// // address : map[city:Mumbai state:Maharashtra]
-
 #include <iostream>
+#include <vector>
 #include <map>
 using namespace std;
 
@@ -196,15 +174,11 @@ class Lexer {
             default:
                 if (isdigit(ch)){ // jesli jest cyfra
                     token = {TokenType::INT, read_number()};
-                    if (ch == ',') {
-                        readPosition--;  // cofamy się żeby jeszcze raz odczytac przecinek
-                    }
+                    return token;
                 }
                 else if (isalpha(ch)){ // jesli znak jest z alfabetu
                     token = {TokenType::BOOL, read_bool()};
-                    if (ch == ',') {
-                        readPosition--;  // cofamy się żeby jeszcze raz odczytac przecinek
-                    }
+                    return token;
                 }
                 else { // jesli inny znak
                     token = {TokenType::ILLEGAL, "ILLEGAL"};
@@ -218,6 +192,13 @@ class Lexer {
         return token;
     }
 
+};
+
+
+struct Json {
+    bool is_array;
+    string scalar;
+    vector<string> array;
 };
 
 class Parser {
@@ -234,50 +215,33 @@ private:
 
 
 
-string parseArray() {
-    string result = "[";               // Inicjalizujemy wynik jako otwierający nawias kwadratowy
-    bool first = true;                // czy jesteśmy przy pierwszym elemencie
+vector<string> parseArray() {
+    vector<string> result;
 
-    nextToken(); // omijamy '['        // Przechodzimy do pierwszego tokena po '['
+    nextToken(); // omijamy '['
 
     while (curToken.type != TokenType::RBRACK && curToken.type != TokenType::EOF_TOKEN) {
         // Pętla dopóki nie napotkamy końca tablicy ']' lub końca pliku
-
-        if (curToken.type == TokenType::COMMA) {
-            nextToken(); // omijamy przecinki między wartościami
-            continue;    // przechodzimy do kolejnego tokena
-        }
-
-        if (!first) result += " ";     // Dodajemy spację przed kolejnym elementem jeśli to nie pierwszy
-
+        
         if (curToken.type == TokenType::INT ||
             curToken.type == TokenType::BOOL ||
             curToken.type == TokenType::STRING) {
-            result += curToken.literal; // Dodajemy wartość (int, bool, string) do wyniku
-            nextToken();                // Przechodzimy do kolejnego tokena
-        } else if (curToken.type == TokenType::LBRACK) {
-            result += parseArray();     // Rekurencyjnie przetwarzamy zagnieżdżoną tablicę
-        } else {
-            break;                      // Nieznany token - przerywamy parsowanie tablicy
-        }
-
-        first = false;                  // Po pierwszym elemencie ustawiamy flagę
+            result.push_back(curToken.literal);
+            } // Dodajemy wartość (int, bool, string) do wyniku
+           
+            nextToken();
+            if (curToken.type == TokenType::COMMA) {
+                nextToken(); // omijamy przecinki między wartościami
+            }
     }
 
-    if (curToken.type == TokenType::RBRACK) {
-        result += "]";       // Dodajemy zamykający nawias jeśli faktycznie znaleźliśmy ']'
-        nextToken();         // Przechodzimy do kolejnego tokena po ']'
-    } else {
-        result += "]";       // Jeśli nawiasu nie było, i tak kończymy wynik nawiasem
-    }
-
-    return result;           // Zwracamy zbudowaną reprezentację tablicy jako string
+    return result;  // Zwracamy zbudowaną reprezentację tablicy
 }
 
 
 
 
-void parse(map<string, string>& values) {
+void parse(map<string, Json>& values) {
     while (curToken.type != TokenType::RBRACE && curToken.type != TokenType::EOF_TOKEN) {
         // Pętla dopóki nie napotkamy końca obiektu '}' lub końca pliku
 
@@ -294,23 +258,25 @@ void parse(map<string, string>& values) {
         }
 
         nextToken();  // Przechodzimy do wartości po dwukropku
-
-        if (curToken.type == TokenType::LBRACK) {
-            values[key] = parseArray(); // Jeśli wartość to tablica - wywołujemy `parseArray`
+        Json val;
+        if (curToken.type == TokenType::LBRACK) { // jesli [
+            val.is_array = true;
+            val.array = parseArray();
         } else if (curToken.type == TokenType::INT ||
                    curToken.type == TokenType::BOOL ||
                    curToken.type == TokenType::STRING) {
-            values[key] = curToken.literal; // Wartość to zwykła wartość (int, bool, string)
+            val.is_array = false;
+            val.scalar = curToken.literal;
             nextToken();                    // Przechodzimy do kolejnego tokena
         } else {
             return;           // Błąd - nieznany typ wartości
         }
 
+        values[key] = val;
         if (curToken.type == TokenType::COMMA) {
             nextToken();      // Jeśli jest przecinek, to przechodzimy do kolejnego pola
-        } else if (curToken.type != TokenType::RBRACE) {
-            return;           // Jeśli nie ma przecinka ani zamknięcia obiektu - błąd formatu
-        }
+        } 
+      
     }
 
     if (curToken.type == TokenType::RBRACE) {
@@ -325,8 +291,8 @@ public:
         nextToken();
     }
 
-    map<string, string> parseJson() {
-        map<string, string> values;
+    map<string, Json> parseJson() {
+        map<string, Json> values;
 
         if (curToken.type != TokenType::LBRACE) {
             cout << "Brak znaku { na poczatku" << endl;
@@ -341,14 +307,28 @@ public:
 };
 
 int main(){
-
-    string data1 = "{\"Name\":\"cats are cute\", \"Age\": 11, \"isAlive\": true, \"ScoreInt\": [ 1,2,3,[9,8,7]]}";
-    // string data1 = "{\"ScoreBool\": [false, false, true]}";
+    // string data1 = "{\"Name\":\"cats are cute\", \"Age\": 11, \"isAlive\": true, \"ScoreInt\": [ 1,2,3,[9,8,7,[1,2]]]}";
+    string data1 = "{\"Name\":\"cats are cute\", \"Age\": 11, \"isAlive\": [true, false, false], \"ScoreInt\": [ 1,2,3,[9,8,7,[1,2]]]}";
+    // string data1 = "{\"ScoreBool\": [false, false, true, [true, false]]}";
     Parser parser(data1);
-    map<string, string> values = parser.parseJson();
+    map<string, Json> values = parser.parseJson();
 
     for (const auto& pair : values) {
-        cout << pair.first << "  :  " << pair.second << std::endl;
+        cout << pair.first << "  :  ";
+        if (pair.second.is_array == false){
+            cout << pair.second.scalar;
+        } else {
+            cout << "[";
+            for (int i=0; i<pair.second.array.size(); i++){
+                cout << pair.second.array[i];
+                if (i != pair.second.array.size() - 1){
+                    cout << " ";
+                }
+            }
+    
+            cout << "]";
+        }
+        cout << endl;
     }
 
 }
